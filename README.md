@@ -13,15 +13,19 @@ many it could have.
 
 ## Install
 
-Currently an npm workspace package, not yet published. Inside this
-monorepo it resolves via the workspace symlink:
+```bash
+npm install queriton
+```
 
 ```ts
 import { Query, DataSet, type Loader, type AnyFieldDef } from 'queriton';
 ```
 
-(Tracking issue [#143](https://github.com/TheSevenPens/DrawTabDataExplorer/issues/143)
-covers the npm-publish path.)
+## Tutorial
+
+A 10-chapter narrative introduction lives at [docs/tutorial/](docs/tutorial/README.md).
+Every code block in the tutorial is extracted and run as part of the
+test suite, so what you read is what works.
 
 ## Minimal example
 
@@ -157,22 +161,24 @@ result-equivalence.
 
 ## Running the tests
 
-The 156-test suite is filesystem- and network-free:
+The 227-test suite is filesystem- and network-free:
 
 ```bash
-# From the outer repo (also runs the queriton tests):
-npm run test:unit
-
-# Or standalone, just the queriton tests:
-cd packages/queriton && npm test
+npm install
+npm test
 ```
 
 The fixtures live under [`test/fixtures/`](./test/fixtures/):
 
 - `mtcars.ts` — classic 32 × 11 dataset; drives most verb coverage
+- `penguins.ts` — Palmer Penguins (344 rows, naturally-occurring nulls)
 - `orders-customers.ts` — 6 + 4 rows for the four join variants
 - `people-hobbies.ts` — array column for `.unroll()`
 - `with-nulls.ts` — 8-row null-handling fixture
+
+The tutorial under [`docs/tutorial/`](./docs/tutorial/README.md) also
+contributes 50 snippet tests via `scripts/build-tutorial-tests.mjs`,
+which extracts every ` ```ts run ` block at test time.
 
 ## License
 

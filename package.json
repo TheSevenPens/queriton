@@ -6,11 +6,10 @@
 	"author": "TheSevenPens",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/TheSevenPens/DrawTabDataExplorer.git",
-		"directory": "packages/queriton"
+		"url": "https://github.com/TheSevenPens/queriton.git"
 	},
-	"homepage": "https://github.com/TheSevenPens/DrawTabDataExplorer/tree/main/packages/queriton#readme",
-	"bugs": "https://github.com/TheSevenPens/DrawTabDataExplorer/issues",
+	"homepage": "https://github.com/TheSevenPens/queriton#readme",
+	"bugs": "https://github.com/TheSevenPens/queriton/issues",
 	"keywords": [
 		"query",
 		"pipeline",

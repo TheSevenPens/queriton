@@ -26,8 +26,8 @@ Every fenced ` ```ts run ` code block in the chapters is extracted into the test
 ## Running the snippets locally
 
 ```bash
-git clone https://github.com/TheSevenPens/DrawTabDataExplorer.git
-cd DrawTabDataExplorer/packages/queriton
+git clone https://github.com/TheSevenPens/queriton.git
+cd queriton
 npm install
 npm test
 ```

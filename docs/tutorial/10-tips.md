@@ -95,7 +95,7 @@ The fusion is automatic; you don't opt in. To verify it's happening for a specif
 You've seen every public verb queriton offers. From here, the next steps depend on what you're building:
 
 - **Reference** — the package's `README.md` has the full API surface, condensed.
-- **The DrawTab Explorer** — queriton's biggest consumer. See [api-explorer/+page.svelte](../../../src/routes/api-explorer/+page.svelte) for a runnable playground over real data.
-- **Custom field-defs** — chapter 9 has the contract. The DrawTab codebase has 10+ examples under [data-repo/lib/entities/](../../../data-repo/lib/entities/).
+- **The DrawTab Explorer** — queriton's biggest consumer. See [src/routes/api-explorer/+page.svelte](https://github.com/TheSevenPens/DrawTabDataExplorer/blob/main/src/routes/api-explorer/+page.svelte) for a runnable playground over real data.
+- **Custom field-defs** — chapter 9 has the contract. The DrawTab codebase has 10+ examples under [data-repo/lib/entities/](https://github.com/TheSevenPens/DrawTabDataExplorer/tree/main/data-repo/lib/entities).
 
 Happy querying.
