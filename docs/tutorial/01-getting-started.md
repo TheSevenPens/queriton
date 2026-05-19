@@ -7,13 +7,24 @@ In this chapter you will install queriton, run your first query, and meet the da
 queriton is a TypeScript library with no runtime dependencies. Install it the usual way:
 
 ```bash
-npm install queriton
+npm install @thesevenpens/queriton
 ```
+
+queriton is currently published to GitHub Packages, so install requires
+one line in your `.npmrc`:
+
+```
+@thesevenpens:registry=https://npm.pkg.github.com
+```
+
+(See the [package README](../../README.md) for full authentication
+setup. Public npmjs.org release is tracked at
+[DrawTab #143](https://github.com/TheSevenPens/DrawTabDataExplorer/issues/143).)
 
 It works in Node, in the browser, and in any bundler that understands ESM. The whole library is one import:
 
 ```ts
-import { Query, DataSet } from 'queriton';
+import { Query, DataSet } from '@thesevenpens/queriton';
 ```
 
 `Query` is the per-collection workhorse. `DataSet` (covered in chapter 8) is an optional container that groups Queries together — you don't need it to get started.

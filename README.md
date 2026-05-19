@@ -13,13 +13,36 @@ many it could have.
 
 ## Install
 
+queriton is currently published to **GitHub Packages**, not the public
+npm registry. Add this to your project's `.npmrc`:
+
+```
+@thesevenpens:registry=https://npm.pkg.github.com
+```
+
+You'll also need to be authenticated to GitHub Packages. For local
+development, a personal access token with `read:packages` scope works:
+
+```
+//npm.pkg.github.com/:_authToken=YOUR_PAT
+```
+
+In CI, `secrets.GITHUB_TOKEN` (added to `.npmrc` via the standard
+[setup-node action](https://github.com/actions/setup-node#use-private-packages))
+is sufficient.
+
+Then:
+
 ```bash
-npm install queriton
+npm install @thesevenpens/queriton
 ```
 
 ```ts
-import { Query, DataSet, type Loader, type AnyFieldDef } from 'queriton';
+import { Query, DataSet, type Loader, type AnyFieldDef } from '@thesevenpens/queriton';
 ```
+
+Public npmjs.org release is tracked at [DrawTab #143](https://github.com/TheSevenPens/DrawTabDataExplorer/issues/143)
+(deferred to 2027).
 
 ## Tutorial
 
@@ -32,7 +55,7 @@ test suite, so what you read is what works.
 Register a collection on a `DataSet`, run a query, materialise it.
 
 ```ts
-import { DataSet, type AnyFieldDef } from 'queriton';
+import { DataSet, type AnyFieldDef } from '@thesevenpens/queriton';
 
 interface Car {
 	model: string;
@@ -152,7 +175,7 @@ the user-authored pre-rewrite plan (which is what saved-view
 persistence and URL state want). Disable the pass for debugging via:
 
 ```ts
-import { rewriteConfig } from 'queriton';
+import { rewriteConfig } from '@thesevenpens/queriton';
 rewriteConfig.enabled = false;
 ```
 

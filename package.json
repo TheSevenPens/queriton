@@ -1,5 +1,5 @@
 {
-	"name": "queriton",
+	"name": "@thesevenpens/queriton",
 	"version": "0.1.0",
 	"description": "Lazy, typed pipeline-of-verb-steps query API for in-memory JSON-shaped collections.",
 	"license": "ISC",
@@ -10,6 +10,9 @@
 	},
 	"homepage": "https://github.com/TheSevenPens/queriton#readme",
 	"bugs": "https://github.com/TheSevenPens/queriton/issues",
+	"publishConfig": {
+		"registry": "https://npm.pkg.github.com"
+	},
 	"keywords": [
 		"query",
 		"pipeline",

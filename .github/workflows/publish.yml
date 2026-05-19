@@ -1,5 +1,11 @@
 name: publish
 
+# Publishes @thesevenpens/queriton to GitHub Packages on tag pushes.
+# Authenticates with the workflow's built-in GITHUB_TOKEN — no extra
+# secrets needed. When the public npmjs.org release happens (DrawTab
+# issue #143), this file will gain a second publish step against
+# registry.npmjs.org with provenance.
+
 on:
   push:
     tags:
@@ -10,16 +16,17 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
+      packages: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@thesevenpens'
           cache: 'npm'
       - run: npm install
       - run: npm test
-      - run: npm publish --access public --provenance
+      - run: npm publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
