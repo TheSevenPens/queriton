@@ -152,4 +152,4 @@ expect(summary[2].islandCount).toBe(1); // Gentoo only on Biscoe
 
 > **From dplyr:** `.summarize()` is `summarise()`. queriton's spec-as-object form is closer to `data.table::dcast` or Arquero's `rollup` than dplyr's verb-per-aggregator style, but the result is the same.
 
-In the next chapter we'll pin down exactly what happens when those summarize aggregators meet null values.
+In the next chapter we'll meet window functions — per-row computations over partitions, the "top N per group" pattern, running aggregates, and offset functions.

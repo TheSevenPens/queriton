@@ -957,3 +957,190 @@ describe('Query — filter after summarize (SQL HAVING)', () => {
 		expect(rows[0].cyl).toBe('4');
 	});
 });
+
+describe('Query — window functions', () => {
+	// A tiny ordered fixture so expected values are easy to eyeball.
+	// Ties are deliberate — they drive rank vs denseRank divergence.
+	type Score = { group: string; player: string; score: number };
+	const scores: Score[] = [
+		{ group: 'A', player: 'a1', score: 10 },
+		{ group: 'A', player: 'a2', score: 10 }, // tie with a1
+		{ group: 'A', player: 'a3', score: 8 },
+		{ group: 'A', player: 'a4', score: 5 },
+		{ group: 'B', player: 'b1', score: 7 },
+		{ group: 'B', player: 'b2', score: 7 }, // tie with b1
+		{ group: 'B', player: 'b3', score: 3 },
+	];
+	const scoreFields = [
+		{ key: 'group', label: 'g', type: 'string' as const, getValue: (r: Score) => r.group },
+		{ key: 'player', label: 'p', type: 'string' as const, getValue: (r: Score) => r.player },
+		{
+			key: 'score',
+			label: 's',
+			type: 'number' as const,
+			getValue: (r: Score) => String(r.score),
+		},
+	];
+	function scoresQ() {
+		return new Query<Score>(async () => scores, scoreFields);
+	}
+
+	it('rowNumber assigns sequential numbers within each partition', async () => {
+		const rows = await scoresQ()
+			.window({ partitionBy: 'group', orderBy: { field: 'score', direction: 'desc' }, rowNumber: 'rn' })
+			.toArray();
+		// Input order preserved — restore by partition+rank to verify.
+		const a = rows.filter((r) => r.group === 'A').sort((x, y) => (x.rn as number) - (y.rn as number));
+		const b = rows.filter((r) => r.group === 'B').sort((x, y) => (x.rn as number) - (y.rn as number));
+		expect(a.map((r) => r.rn)).toEqual([1, 2, 3, 4]);
+		expect(b.map((r) => r.rn)).toEqual([1, 2, 3]);
+		// a1 came before a2 in input; with the same score, rowNumber keeps that order.
+		expect(a[0].player).toBe('a1');
+		expect(a[1].player).toBe('a2');
+	});
+
+	it('rank shares values on ties and skips; denseRank does not skip', async () => {
+		const rows = await scoresQ()
+			.window({
+				partitionBy: 'group',
+				orderBy: { field: 'score', direction: 'desc' },
+				rank: 'r',
+				denseRank: 'dr',
+			})
+			.toArray();
+		// Group A: scores 10, 10, 8, 5 → rank 1, 1, 3, 4; denseRank 1, 1, 2, 3.
+		const a = rows
+			.filter((r) => r.group === 'A')
+			.sort((x, y) => (x.r as number) - (y.r as number) || x.player.localeCompare(y.player));
+		expect(a.map((r) => r.r)).toEqual([1, 1, 3, 4]);
+		expect(a.map((r) => r.dr)).toEqual([1, 1, 2, 3]);
+	});
+
+	it('preserves input row order in the output', async () => {
+		const rows = await scoresQ()
+			.window({ partitionBy: 'group', orderBy: 'score', rowNumber: 'rn' })
+			.toArray();
+		// Same length, same player order as the input.
+		expect(rows.map((r) => r.player)).toEqual(scores.map((s) => s.player));
+	});
+
+	it('top N per group via window + filter', async () => {
+		// Idiomatic "top 2 per group" pattern.
+		const top2 = await scoresQ()
+			.window({ partitionBy: 'group', orderBy: { field: 'score', direction: 'desc' }, rowNumber: 'rn' })
+			.filter('rn', '<=', 2)
+			.toArray();
+		// Group A top 2: a1 (10), a2 (10). Group B top 2: b1 (7), b2 (7).
+		expect(top2.map((r) => r.player).sort()).toEqual(['a1', 'a2', 'b1', 'b2']);
+	});
+
+	it('runningSum / runningAvg accumulate within partition', async () => {
+		const rows = await scoresQ()
+			.window({
+				partitionBy: 'group',
+				orderBy: 'score', // ascending — easier to verify
+				runningSum: { cum: 'score' },
+				runningAvg: { avg: 'score' },
+			})
+			.toArray();
+		// Group A asc: 5, 8, 10, 10 → cum 5, 13, 23, 33.
+		const a = rows
+			.filter((r) => r.group === 'A')
+			.sort((x, y) => (x.cum as number) - (y.cum as number));
+		expect(a.map((r) => r.cum)).toEqual([5, 13, 23, 33]);
+		// Group A asc avg: 5, 6.5, 23/3, 33/4 = 8.25.
+		expect(a[3].avg).toBeCloseTo(8.25, 4);
+	});
+
+	it('runningMin / runningMax / runningCount', async () => {
+		const rows = await scoresQ()
+			.window({
+				partitionBy: 'group',
+				orderBy: 'score',
+				runningMin: { lo: 'score' },
+				runningMax: { hi: 'score' },
+				runningCount: 'rc',
+			})
+			.toArray();
+		// Group B asc: 3, 7, 7. min stays 3, max climbs 3→7→7, rc 1,2,3.
+		const b = rows.filter((r) => r.group === 'B').sort((x, y) => (x.rc as number) - (y.rc as number));
+		expect(b.map((r) => r.lo)).toEqual([3, 3, 3]);
+		expect(b.map((r) => r.hi)).toEqual([3, 7, 7]);
+		expect(b.map((r) => r.rc)).toEqual([1, 2, 3]);
+	});
+
+	it('lag / lead return adjacent values within partition', async () => {
+		const rows = await scoresQ()
+			.window({
+				partitionBy: 'group',
+				orderBy: 'score',
+				lag: { prev: 'score' },
+				lead: { next: 'score' },
+			})
+			.toArray();
+		// Group B asc: 3, 7, 7. lag: '', '3', '7'. lead: '7', '7', ''.
+		const b = rows
+			.filter((r) => r.group === 'B')
+			.sort((x, y) => Number(x.score) - Number(y.score) || x.player.localeCompare(y.player));
+		expect(b.map((r) => r.prev)).toEqual(['', '3', '7']);
+		expect(b.map((r) => r.next)).toEqual(['7', '7', '']);
+	});
+
+	it('lag default value substitutes for out-of-range', async () => {
+		const rows = await scoresQ()
+			.window({
+				partitionBy: 'group',
+				orderBy: 'score',
+				lag: { prev: { field: 'score', default: 'N/A' } },
+			})
+			.toArray();
+		// Group B asc: 3, 7, 7. First row's lag has no predecessor → 'N/A'.
+		const b3 = rows.find((r) => r.player === 'b3'); // score 3, smallest in group B
+		expect(b3?.prev).toBe('N/A');
+	});
+
+	it('firstValue / lastValue read partition endpoints', async () => {
+		const rows = await scoresQ()
+			.window({
+				partitionBy: 'group',
+				orderBy: { field: 'score', direction: 'desc' },
+				firstValue: { topPlayer: 'player' },
+				lastValue: { bottomPlayer: 'player' },
+			})
+			.toArray();
+		// Group A desc: a1, a2, a3, a4. Top = a1, bottom = a4.
+		// Group B desc: b1, b2, b3. Top = b1, bottom = b3.
+		const a = rows.filter((r) => r.group === 'A');
+		expect(a[0].topPlayer).toBe('a1');
+		expect(a[0].bottomPlayer).toBe('a4');
+		const b = rows.filter((r) => r.group === 'B');
+		expect(b[0].topPlayer).toBe('b1');
+		expect(b[0].bottomPlayer).toBe('b3');
+	});
+
+	it('no partitionBy → one global partition', async () => {
+		const rows = await scoresQ()
+			.window({ orderBy: { field: 'score', direction: 'desc' }, rowNumber: 'rn' })
+			.toArray();
+		// All 7 rows in one partition; rowNumbers 1..7 distributed by descending score.
+		const sorted = rows.slice().sort((x, y) => (x.rn as number) - (y.rn as number));
+		expect(sorted.map((r) => r.rn)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+		// Top row has the highest score (10 — a1 or a2; a1 wins on input order).
+		expect(sorted[0].score).toBe(10);
+	});
+
+	it('works on real-world data: top N cars per cylinder count', async () => {
+		// mtcars has 11 four-cyl, 7 six-cyl, 14 eight-cyl cars. Window-partition
+		// by cyl, order by mpg desc, take rowNumber=1 → the highest-mpg car per cyl.
+		const tops = await carsQ()
+			.window({
+				partitionBy: 'cyl',
+				orderBy: { field: 'mpg', direction: 'desc' },
+				rowNumber: 'rn',
+			})
+			.filter('rn', '==', 1)
+			.toArray();
+		expect(tops).toHaveLength(3); // one winner per distinct cyl value
+		expect(tops.find((c) => c.cyl === 4)?.model).toBe('Toyota Corolla');
+	});
+});

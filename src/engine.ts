@@ -19,6 +19,8 @@ import type {
 	ConcatResolvedStep,
 	IntersectResolvedStep,
 	ExceptResolvedStep,
+	WindowStep,
+	WindowSpec,
 	SummaryRow,
 } from './types.js';
 
@@ -161,6 +163,12 @@ export function executePipeline<T>(
 			case 'distinctRows':
 				data = applyDistinctRows(data);
 				break;
+			case 'window': {
+				const { rows, fields: extended } = applyWindow(data, step, activeFields);
+				data = rows;
+				activeFields = extended;
+				break;
+			}
 			case 'unroll':
 				data = applyUnroll(data, step);
 				break;
@@ -704,6 +712,229 @@ function applyDistinctRows(items: unknown[]): unknown[] {
 		}
 	}
 	return out;
+}
+
+/**
+ * Computes window functions per partition. Tags rows with input index,
+ * groups by `partitionBy`, sorts each group by `orderBy`, walks each
+ * group computing every requested window function, then restores input
+ * order via the index tags. Synthesises field-defs for the new columns.
+ */
+function applyWindow(
+	items: unknown[],
+	step: WindowStep,
+	fields: FieldDef<unknown>[],
+): { rows: unknown[]; fields: FieldDef<unknown>[] } {
+	const spec = step.spec;
+
+	// --- Normalise spec ---
+	const partitionKeys =
+		spec.partitionBy === undefined
+			? []
+			: Array.isArray(spec.partitionBy)
+				? spec.partitionBy
+				: [spec.partitionBy];
+	const orderField = typeof spec.orderBy === 'string' ? spec.orderBy : spec.orderBy?.field;
+	const orderDesc =
+		typeof spec.orderBy === 'object' && spec.orderBy !== null && spec.orderBy.direction === 'desc';
+
+	// Resolvers for read access via field-defs.
+	const partitionGetters = partitionKeys.map((k) => {
+		const def = getFieldDef(k, fields);
+		if (!def) throw new Error(`window: unknown partitionBy field '${k}'`);
+		return def;
+	});
+	const orderGetter = orderField ? getFieldDef(orderField, fields) : undefined;
+	if (orderField && !orderGetter) {
+		throw new Error(`window: unknown orderBy field '${orderField}'`);
+	}
+
+	// --- Partition rows (with input-index tags) ---
+	type Tagged = { item: unknown; idx: number };
+	const groups = new Map<string, Tagged[]>();
+	items.forEach((item, idx) => {
+		const key = partitionGetters.map((d) => d.getValue(item)).join('');
+		const list = groups.get(key);
+		if (list) list.push({ item, idx });
+		else groups.set(key, [{ item, idx }]);
+	});
+
+	// --- Sort within each partition by orderBy (stable on input index) ---
+	if (orderGetter) {
+		for (const partition of groups.values()) {
+			partition.sort((a, b) => {
+				const av = orderGetter.getValue(a.item);
+				const bv = orderGetter.getValue(b.item);
+				let cmp: number;
+				const an = Number(av);
+				const bn = Number(bv);
+				if (av !== '' && bv !== '' && Number.isFinite(an) && Number.isFinite(bn)) {
+					cmp = an - bn;
+				} else {
+					cmp = av.localeCompare(bv);
+				}
+				if (orderDesc) cmp = -cmp;
+				return cmp === 0 ? a.idx - b.idx : cmp;
+			});
+		}
+	}
+
+	// --- Pre-resolve field-defs for every per-field spec entry ---
+	function resolveField(key: string): FieldDef<unknown> {
+		const def = getFieldDef(key, fields);
+		if (!def) throw new Error(`window: unknown field '${key}'`);
+		return def;
+	}
+
+	// --- Output array sized to input; filled by partition walks ---
+	const output: Record<string, unknown>[] = new Array(items.length);
+
+	for (const partition of groups.values()) {
+		const n = partition.length;
+
+		// State for the within-partition walk.
+		const runSum: Record<string, number> = {};
+		const runCount: Record<string, number> = {};
+		const runMin: Record<string, number> = {};
+		const runMax: Record<string, number> = {};
+		let runRowCount = 0;
+		let rank = 0;
+		let denseRank = 0;
+		let prevRankKey: string | undefined;
+
+		// Precompute boundary values for the partition.
+		const firstOf: Record<string, string> = {};
+		const lastOf: Record<string, string> = {};
+		if (spec.firstValue && n > 0) {
+			for (const [outName, fieldKey] of Object.entries(spec.firstValue)) {
+				firstOf[outName] = resolveField(fieldKey).getValue(partition[0].item);
+			}
+		}
+		if (spec.lastValue && n > 0) {
+			for (const [outName, fieldKey] of Object.entries(spec.lastValue)) {
+				lastOf[outName] = resolveField(fieldKey).getValue(partition[n - 1].item);
+			}
+		}
+
+		for (let i = 0; i < n; i++) {
+			const tagged = partition[i];
+			const out: Record<string, unknown> = { ...(tagged.item as object) };
+
+			// rowNumber — sequential, stable.
+			runRowCount += 1;
+			if (spec.rowNumber) out[spec.rowNumber] = runRowCount;
+
+			// rank / denseRank — ties detected via the orderBy value.
+			if (spec.rank || spec.denseRank) {
+				const rankKey = orderGetter ? orderGetter.getValue(tagged.item) : '';
+				if (rankKey !== prevRankKey) {
+					rank = i + 1;
+					denseRank += 1;
+					prevRankKey = rankKey;
+				}
+				if (spec.rank) out[spec.rank] = rank;
+				if (spec.denseRank) out[spec.denseRank] = denseRank;
+			}
+
+			// Running aggregates — include current row.
+			if (spec.runningSum) {
+				for (const [outName, fieldKey] of Object.entries(spec.runningSum)) {
+					const v = resolveField(fieldKey).getValue(tagged.item);
+					const n = Number(v);
+					if (v !== '' && Number.isFinite(n)) runSum[outName] = (runSum[outName] ?? 0) + n;
+					out[outName] = runSum[outName] ?? 0;
+				}
+			}
+			if (spec.runningAvg) {
+				for (const [outName, fieldKey] of Object.entries(spec.runningAvg)) {
+					const v = resolveField(fieldKey).getValue(tagged.item);
+					const num = Number(v);
+					if (v !== '' && Number.isFinite(num)) {
+						runSum[outName] = (runSum[outName] ?? 0) + num;
+						runCount[outName] = (runCount[outName] ?? 0) + 1;
+					}
+					out[outName] = runCount[outName] ? runSum[outName] / runCount[outName] : 0;
+				}
+			}
+			if (spec.runningMin) {
+				for (const [outName, fieldKey] of Object.entries(spec.runningMin)) {
+					const v = resolveField(fieldKey).getValue(tagged.item);
+					const num = Number(v);
+					if (v !== '' && Number.isFinite(num)) {
+						runMin[outName] = runMin[outName] === undefined ? num : Math.min(runMin[outName], num);
+					}
+					out[outName] = runMin[outName] ?? 0;
+				}
+			}
+			if (spec.runningMax) {
+				for (const [outName, fieldKey] of Object.entries(spec.runningMax)) {
+					const v = resolveField(fieldKey).getValue(tagged.item);
+					const num = Number(v);
+					if (v !== '' && Number.isFinite(num)) {
+						runMax[outName] = runMax[outName] === undefined ? num : Math.max(runMax[outName], num);
+					}
+					out[outName] = runMax[outName] ?? 0;
+				}
+			}
+			if (spec.runningCount) {
+				out[spec.runningCount] = runRowCount;
+			}
+
+			// Offsets — lag (prev) / lead (next) within partition.
+			if (spec.lag) {
+				for (const [outName, entry] of Object.entries(spec.lag)) {
+					const cfg = typeof entry === 'string' ? { field: entry } : entry;
+					const offset = cfg.offset ?? 1;
+					const tgt = i - offset;
+					out[outName] =
+						tgt >= 0 ? resolveField(cfg.field).getValue(partition[tgt].item) : (cfg.default ?? '');
+				}
+			}
+			if (spec.lead) {
+				for (const [outName, entry] of Object.entries(spec.lead)) {
+					const cfg = typeof entry === 'string' ? { field: entry } : entry;
+					const offset = cfg.offset ?? 1;
+					const tgt = i + offset;
+					out[outName] =
+						tgt < n ? resolveField(cfg.field).getValue(partition[tgt].item) : (cfg.default ?? '');
+				}
+			}
+
+			// Boundary
+			if (spec.firstValue) {
+				for (const outName of Object.keys(spec.firstValue)) out[outName] = firstOf[outName];
+			}
+			if (spec.lastValue) {
+				for (const outName of Object.keys(spec.lastValue)) out[outName] = lastOf[outName];
+			}
+
+			output[tagged.idx] = out;
+		}
+		// Per-partition state is `let`/`const`-scoped inside the outer loop —
+		// no explicit reset needed; the next iteration starts fresh.
+	}
+
+	// --- Synthesise field-defs for the new columns ---
+	const newCols: { key: string; numeric: boolean }[] = [];
+	if (spec.rowNumber) newCols.push({ key: spec.rowNumber, numeric: true });
+	if (spec.rank) newCols.push({ key: spec.rank, numeric: true });
+	if (spec.denseRank) newCols.push({ key: spec.denseRank, numeric: true });
+	if (spec.runningCount) newCols.push({ key: spec.runningCount, numeric: true });
+	for (const obj of [spec.runningSum, spec.runningAvg, spec.runningMin, spec.runningMax]) {
+		if (obj) for (const k of Object.keys(obj)) newCols.push({ key: k, numeric: true });
+	}
+	for (const obj of [spec.lag, spec.lead, spec.firstValue, spec.lastValue]) {
+		if (obj) for (const k of Object.keys(obj)) newCols.push({ key: k, numeric: false });
+	}
+
+	const syntheticFields: FieldDef<unknown>[] = newCols.map(({ key, numeric }) => ({
+		key,
+		label: key,
+		type: numeric ? ('number' as const) : ('string' as const),
+		getValue: (row: unknown) => String((row as Record<string, unknown>)[key] ?? ''),
+	}));
+
+	return { rows: output, fields: [...fields, ...syntheticFields] };
 }
 
 function applyUnroll(items: unknown[], step: UnrollStep): unknown[] {

@@ -1,4 +1,4 @@
-# 8. Set Operations
+# 9. Set Operations
 
 In this chapter you'll combine Queries the way SQL's set operators do: UNION ALL (`.concat()`), INTERSECT (`.intersect()`), EXCEPT (`.except()`), plus the row-dedup verb (`.distinctRows()`) that composes the rest into a deduped UNION.
 
@@ -96,9 +96,9 @@ Things to notice:
 | Rows in both | `.intersect()` |
 | Rows in left, not in right | `.except()` |
 | Drop duplicates within one Query | `.distinctRows()` |
-| Filter left by membership in right (partial-key match) | `.semijoin(other, leftKey, rightKey)` (chapter 7) |
-| Filter left by non-membership in right (partial-key match) | `.antijoin(other, leftKey, rightKey)` (chapter 7) |
+| Filter left by membership in right (partial-key match) | `.semijoin(other, leftKey, rightKey)` (chapter 8) |
+| Filter left by non-membership in right (partial-key match) | `.antijoin(other, leftKey, rightKey)` (chapter 8) |
 
-The set operations are full-row by design. When you need partial-row equality (e.g. "orders whose customerId exists in customers"), the semi/anti joins from chapter 7 are the right tool.
+The set operations are full-row by design. When you need partial-row equality (e.g. "orders whose customerId exists in customers"), the semi/anti joins from chapter 8 are the right tool.
 
 In the next chapter we'll meet the DataSet — queriton's named-collection container.

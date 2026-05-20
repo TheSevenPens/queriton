@@ -29,6 +29,7 @@ export type StepKind =
 	| 'except'
 	| 'exceptResolved'
 	| 'distinctRows'
+	| 'window'
 	| 'topK';
 
 export interface FilterStep {
@@ -312,6 +313,61 @@ export interface DistinctRowsStep {
 }
 
 /**
+ * Spec for `lag` / `lead` window functions. The longer form lets you
+ * customise the offset (default 1) and the value returned when the
+ * offset reaches outside the partition (default `""`).
+ */
+export type WindowOffsetEntry = string | { field: string; offset?: number; default?: string };
+
+/**
+ * Window function specification. Mirrors `SummarizeSpec`'s shape — one
+ * object listing every column to add and how to compute it. Unlike
+ * `summarize`, `window` keeps every input row and adds columns
+ * computed per partition (`partitionBy`) and per row order within
+ * partition (`orderBy`).
+ *
+ * Ranking and running aggregates require `orderBy`; boundary
+ * (firstValue / lastValue) doesn't.
+ */
+export interface WindowSpec {
+	/** Field key(s) defining partitions. Omit for one global partition. */
+	partitionBy?: string | string[];
+	/** Order within partition. Required for ranking, offsets, running aggregates. */
+	orderBy?: string | { field: string; direction?: 'asc' | 'desc' };
+
+	/** Sequential within partition; ties broken by input order. */
+	rowNumber?: string;
+	/** Ties share a rank; next rank skips (1, 2, 2, 4). */
+	rank?: string;
+	/** Ties share a rank; next rank doesn't skip (1, 2, 2, 3). */
+	denseRank?: string;
+
+	/** Running aggregates — `outName → fieldKey`. Include rows up to and
+	 *  including the current row (SQL `ROWS UNBOUNDED PRECEDING`). */
+	runningSum?: Record<string, string>;
+	runningAvg?: Record<string, string>;
+	runningMin?: Record<string, string>;
+	runningMax?: Record<string, string>;
+	/** Running count — output column name as string (no field needed). */
+	runningCount?: string;
+
+	/** Previous-row value within partition. Out-of-range → "" (or `default`). */
+	lag?: Record<string, WindowOffsetEntry>;
+	/** Next-row value within partition. Out-of-range → "" (or `default`). */
+	lead?: Record<string, WindowOffsetEntry>;
+
+	/** First row's value in partition (per order). */
+	firstValue?: Record<string, string>;
+	/** Last row's value in partition (per order). */
+	lastValue?: Record<string, string>;
+}
+
+export interface WindowStep {
+	kind: 'window';
+	spec: WindowSpec;
+}
+
+/**
  * Explodes an array-valued top-level field into one row per element. Rows
  * with non-array or empty-array values for the field are dropped (matches
  * Arquero / dplyr's `unnest` semantics).
@@ -370,7 +426,8 @@ export type Step =
 	| IntersectResolvedStep
 	| ExceptStep
 	| ExceptResolvedStep
-	| DistinctRowsStep;
+	| DistinctRowsStep
+	| WindowStep;
 
 /**
  * Shape of rows produced by a `summarize` or `project` step. Keys are the

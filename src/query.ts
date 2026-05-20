@@ -21,6 +21,8 @@ import type {
 	IntersectStep,
 	ExceptStep,
 	DistinctRowsStep,
+	WindowStep,
+	WindowSpec,
 } from './types.js';
 import { executePipeline } from './engine.js';
 import { rewrite } from './rewrite.js';
@@ -501,6 +503,34 @@ export class Query<T> {
 			...this.steps,
 			{ kind: 'distinctRows' } as DistinctRowsStep,
 		]);
+	}
+
+	/**
+	 * Window functions — per-row computations over a partition of related
+	 * rows. Unlike `summarize`, keeps every input row and adds columns;
+	 * unlike `derive`, can reference other rows in the same partition.
+	 *
+	 * The spec lists every column to add. `partitionBy` defines groups;
+	 * `orderBy` defines order within group. Ranking (`rowNumber` / `rank`
+	 * / `denseRank`), running aggregates (`runningSum` / `runningAvg` /
+	 * `runningMin` / `runningMax` / `runningCount`), offsets (`lag` /
+	 * `lead`), and boundary (`firstValue` / `lastValue`) are all
+	 * supported. See `WindowSpec` in types.ts for the full shape.
+	 *
+	 * The killer use case is "top N per group":
+	 *
+	 *   .window({ partitionBy: 'species', orderBy: { field: 'mass', direction: 'desc' }, rowNumber: 'rank' })
+	 *   .filter('rank', '<=', 3)
+	 *
+	 * Output preserves input row order — window functions decorate, they
+	 * don't reorder.
+	 */
+	window<K extends string>(spec: WindowSpec): Query<T & Record<K, string | number>> {
+		return new Query(
+			this.load as unknown as () => Promise<(T & Record<K, string | number>)[]>,
+			this.fields,
+			[...this.steps, { kind: 'window', spec } as WindowStep],
+		);
 	}
 
 	/**

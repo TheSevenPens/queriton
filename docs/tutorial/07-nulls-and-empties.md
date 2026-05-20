@@ -1,4 +1,4 @@
-# 6. Nulls and Empties
+# 7. Nulls and Empties
 
 In this chapter you'll learn exactly how queriton treats missing values. The rules are small, consistent, and in three specific places they diverge from SQL — pin them now so they don't surprise you later.
 

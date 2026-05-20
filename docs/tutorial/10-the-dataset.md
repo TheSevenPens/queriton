@@ -1,4 +1,4 @@
-# 9. The DataSet
+# 10. The DataSet
 
 In this chapter you'll meet `DataSet` — queriton's container for named collections. A DataSet groups related Queries together, memoises each one's loader, and gives you a uniform place to look them up.
 
