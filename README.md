@@ -1,17 +1,13 @@
 # queriton
 
-A lazy, typed pipeline-of-verb-steps query API for in-memory JSON-shaped
-collections. dplyr-style verbs (`filter`, `sort`, `summarize`, `join`,
+TDR: A lazy, typed pipeline-of-verb-steps query API for in-memory JSON-shaped
+collections. 
+
+SUMMARY: dplyr-style verbs (`filter`, `sort`, `summarize`, `join`,
 `unroll`, `derive`, …) build up a `Step[]` that's executed on demand
-when you materialise the `Query` — and the pipeline itself is data, so
-saved views, URL-state round-trips, and API-explorer-style introspection
-are first-class.
+when you materialise the `Query`.
 
-Designed to be reusable. The package is a thin standalone core; the
-DrawTab data explorer that drives its development is one consumer among
-many it could have.
-
-## Install
+## Installing into your code
 
 queriton is currently published to **GitHub Packages**, not the public
 npm registry. Add this to your project's `.npmrc`:
