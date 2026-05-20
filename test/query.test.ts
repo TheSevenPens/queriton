@@ -588,6 +588,71 @@ describe('Query — concat / union', () => {
 	});
 });
 
+describe('Query — intersect / except / distinctRows', () => {
+	// Use mtcars filtered slices that we know overlap. Two overlapping
+	// queries: 4-cyl manuals vs 4-cyl Mercs. A specific row lives in
+	// the four-cyl set but not the manuals set, so set ops are easy to
+	// verify with .count().
+	function fourCyl() {
+		return carsQ().filter('cyl', '==', 4);
+	}
+	function manuals() {
+		return carsQ().filter('am', '==', 1);
+	}
+
+	it('intersect keeps rows present in both, deduplicated', async () => {
+		const both = await fourCyl().intersect(manuals()).toArray();
+		// Hand-checked subset from mtcars: 4-cyl AND manual = 8 specific cars.
+		expect(both).toHaveLength(8);
+		// All survivors satisfy both predicates.
+		expect(both.every((c) => c.cyl === 4 && c.am === 1)).toBe(true);
+	});
+
+	it('except keeps rows in left but not right, deduplicated', async () => {
+		const onlyAutoFourCyl = await fourCyl().except(manuals()).toArray();
+		// 4-cyl AND NOT manual: 11 four-cyl cars total, 8 are manual, so 3 are auto.
+		expect(onlyAutoFourCyl).toHaveLength(3);
+		expect(onlyAutoFourCyl.every((c) => c.cyl === 4 && c.am === 0)).toBe(true);
+	});
+
+	it('intersect dedupes the left side', async () => {
+		// Concat fourCyl with itself, then intersect with manuals — even
+		// with duplicates on the left, intersect produces one row per
+		// unique survivor.
+		const doubled = fourCyl().concat(fourCyl());
+		const both = await doubled.intersect(manuals()).toArray();
+		expect(both).toHaveLength(8);
+	});
+
+	it('distinctRows is the foundation for UNION DISTINCT via composition', async () => {
+		// concat doubles the rows; distinctRows brings it back to one row
+		// per unique full-row shape.
+		const doubled = await fourCyl().concat(fourCyl()).count();
+		const deduped = await fourCyl().concat(fourCyl()).distinctRows().count();
+		expect(doubled).toBe(2 * deduped);
+		expect(deduped).toBe(11); // 11 four-cyl cars in mtcars
+	});
+
+	it('distinctRows compares full row, not just one field', async () => {
+		// Build two rows that differ in one field but otherwise match —
+		// distinctRows should keep both.
+		type R = { id: number; v: number };
+		const rows: R[] = [
+			{ id: 1, v: 10 },
+			{ id: 1, v: 10 }, // exact duplicate of above
+			{ id: 1, v: 20 }, // same id, different v
+			{ id: 2, v: 10 }, // same v, different id
+		];
+		const fields = [
+			{ key: 'id', label: 'id', type: 'number' as const, getValue: (r: R) => String(r.id) },
+			{ key: 'v', label: 'v', type: 'number' as const, getValue: (r: R) => String(r.v) },
+		];
+		const out = await new Query<R>(async () => rows, fields).distinctRows().toArray();
+		// Three unique rows: {1,10}, {1,20}, {2,10}.
+		expect(out).toHaveLength(3);
+	});
+});
+
 describe('Query — unroll', () => {
 	it('explodes an array-valued column into one row per element', async () => {
 		// Lift hobbies to a top-level column via derive (keeping null as null,
