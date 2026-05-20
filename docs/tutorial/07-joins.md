@@ -1,4 +1,4 @@
-# 6. Joins
+# 7. Joins
 
 In this chapter you'll combine rows from two Queries on a shared key. queriton has four join variants — inner, left, semi, anti — covering both "merge their columns" and "use the other side as a filter."
 

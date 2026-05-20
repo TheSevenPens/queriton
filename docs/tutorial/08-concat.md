@@ -1,4 +1,4 @@
-# 7. Concat
+# 8. Concat
 
 In this chapter you'll combine two Queries vertically with `.concat()` — SQL's `UNION ALL` by another name.
 

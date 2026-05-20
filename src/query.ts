@@ -86,6 +86,14 @@ export interface SummarizeSpec {
 	last?: Record<string, string>;
 	/** Array of all raw values per group (input order, includes empties). */
 	collect?: Record<string, string>;
+	/**
+	 * String of all raw values per group joined by `sep` (input order,
+	 * includes empties). The string equivalent of `collect`. Useful for
+	 * round-tripping CSV-like fields without a follow-up `.derive()`.
+	 *
+	 *   join: { tagsCsv: { field: 'tag', sep: ',' } }
+	 */
+	join?: Record<string, { field: string; sep: string }>;
 }
 
 export function summarizeSpecToAggs(spec: SummarizeSpec): AggregatorSpec[] {
@@ -116,6 +124,11 @@ export function summarizeSpecToAggs(spec: SummarizeSpec): AggregatorSpec[] {
 	for (const op of fieldedOps) {
 		for (const [name, field] of Object.entries(spec[op] ?? {})) {
 			aggs.push({ name, op, field });
+		}
+	}
+	if (spec.join) {
+		for (const [name, { field, sep }] of Object.entries(spec.join)) {
+			aggs.push({ name, op: 'join', field, sep });
 		}
 	}
 	return aggs;
@@ -291,9 +304,17 @@ export class Query<T> {
 	 * Explodes a top-level array-valued column into one row per element. For
 	 * nested arrays on entities (`Model.AlternateNames`) call `.derive()` first
 	 * to lift the array to a top-level column.
+	 *
+	 * Pass `{ sep }` when the source field is a CSV-like string (e.g.
+	 * `"climbing,coding,tea"`) — queriton splits on the separator and drops
+	 * empty-string elements before exploding, so you don't need a
+	 * `.derive().filter(Boolean)` two-step.
 	 */
-	unroll(field: string): Query<T> {
-		return new Query(this.load, this.fields, [...this.steps, { kind: 'unroll', field }]);
+	unroll(field: string, opts?: { sep?: string }): Query<T> {
+		return new Query(this.load, this.fields, [
+			...this.steps,
+			{ kind: 'unroll', field, ...(opts?.sep !== undefined ? { sep: opts.sep } : {}) },
+		]);
 	}
 
 	/**
@@ -351,16 +372,27 @@ export class Query<T> {
 	 * the *current* row shape — call `.derive()` before `.summarize()` /
 	 * `.project()` if you want the derived values available in those steps.
 	 * Returns a Query whose row shape is widened to include the new keys.
+	 *
+	 * Each function may return `string | number | readonly unknown[]`. The
+	 * array form is intended for composing with `.unroll()` — derive an
+	 * array column, then explode it. The values are stored on the row as-is;
+	 * downstream code that reads them via a field-def's `getValue` gets the
+	 * stringified form (`Array.prototype.toString` produces a CSV).
 	 */
 	derive<K extends string>(
-		cols: Record<K, (item: T) => string | number>,
-	): Query<T & Record<K, string | number>> {
+		cols: Record<K, (item: T) => string | number | readonly unknown[]>,
+	): Query<T & Record<K, string | number | readonly unknown[]>> {
 		return new Query(
-			this.load as unknown as () => Promise<(T & Record<K, string | number>)[]>,
+			this.load as unknown as () => Promise<
+				(T & Record<K, string | number | readonly unknown[]>)[]
+			>,
 			this.fields,
 			[
 				...this.steps,
-				{ kind: 'derive', cols: cols as Record<string, (item: unknown) => string | number> },
+				{
+					kind: 'derive',
+					cols: cols as Record<string, (item: unknown) => string | number | readonly unknown[]>,
+				},
 			],
 		);
 	}

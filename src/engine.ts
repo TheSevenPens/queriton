@@ -351,9 +351,10 @@ function applySummarize(
 			getValue: (row: unknown) => String((row as SummaryRow)[a.name] ?? ''),
 			// Numeric ops produce numbers; first/last produce raw strings;
 			// collect produces an array which stringifies to a CSV when read
-			// back through getValue (good enough for filter/sort fallthrough).
+			// back through getValue (good enough for filter/sort fallthrough);
+			// join produces a string.
 			type:
-				a.op === 'first' || a.op === 'last' || a.op === 'collect'
+				a.op === 'first' || a.op === 'last' || a.op === 'collect' || a.op === 'join'
 					? ('string' as const)
 					: ('number' as const),
 			group: 'Aggregate',
@@ -403,6 +404,8 @@ function computeAggregator(
 			return raw.length > 0 ? raw[raw.length - 1] : '';
 		case 'collect':
 			return raw;
+		case 'join':
+			return raw.join(spec.sep ?? '');
 		case 'distinctCount': {
 			const set = new Set<string>();
 			for (const v of raw) if (v !== '') set.add(v);
@@ -640,13 +643,23 @@ function applyUnroll(items: unknown[], step: UnrollStep): unknown[] {
 	const out: unknown[] = [];
 	for (const item of items) {
 		const value = (item as Record<string, unknown>)[step.field];
-		if (Array.isArray(value)) {
+		// `sep`-mode: read as string, split, drop empty-string elements. The
+		// empty-string drop is load-bearing — `''.split(',')` returns `['']`,
+		// which would otherwise emit a phantom row per input row.
+		const arr =
+			step.sep !== undefined && typeof value === 'string'
+				? value.split(step.sep).filter((s) => s.length > 0)
+				: Array.isArray(value)
+					? value
+					: null;
+		if (arr) {
 			// Empty array → drop the row (matches Arquero / dplyr `unnest`).
-			for (const el of value) {
+			for (const el of arr) {
 				out.push({ ...(item as object), [step.field]: el });
 			}
 		} else {
-			// Non-array value → pass through unchanged. Allows mixed shapes.
+			// Non-array (and not a string under `sep`-mode) → pass through.
+			// Allows mixed shapes and survives `null` cells unchanged.
 			out.push(item);
 		}
 	}

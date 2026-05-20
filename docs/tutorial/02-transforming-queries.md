@@ -85,7 +85,7 @@ expect(sorted[0]).toMatchObject({ species: 'Adelie', body_mass_g: 4775 });
 Things to notice:
 
 - queriton's sort is stable, so secondary keys within the same primary value preserve input order — but for predictability it's better to make the order explicit with multi-key sort.
-- Sort runs after filter and before take in a typical pipeline. queriton has an internal optimisation (`topK`) that fuses `.sort().take(n)` into one pass — covered in chapter 10.
+- Sort runs after filter and before take in a typical pipeline. queriton has an internal optimisation (`topK`) that fuses `.sort().take(n)` into one pass — covered in chapter 11.
 
 ## Limiting: take, skip, last, reverse
 
