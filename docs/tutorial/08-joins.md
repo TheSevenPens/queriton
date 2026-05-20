@@ -1,4 +1,4 @@
-# 7. Joins
+# 8. Joins
 
 In this chapter you'll combine rows from two Queries on a shared key. queriton has four join variants — inner, left, semi, anti — covering both "merge their columns" and "use the other side as a filter."
 
@@ -138,4 +138,4 @@ Things to notice:
 | `.semijoin()` | match                   | no                          |
 | `.antijoin()` | don't match             | no                          |
 
-In the next chapter we'll cover concatenation — combining Queries vertically rather than horizontally.
+In the next chapter we'll cover set operations — combining Queries with UNION, INTERSECT, and EXCEPT semantics.

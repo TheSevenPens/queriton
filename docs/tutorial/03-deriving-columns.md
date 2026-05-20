@@ -56,7 +56,7 @@ expect(longBills[0].island).toBe('Biscoe');
 expect((longBills[0].billRatio as number).toFixed(3)).toBe('3.510');
 ```
 
-A subtlety: a derived column you reference via the `.sort('billRatio', ...)` string form is recognised by its synthetic field-def, which queriton adds automatically when you `.derive()`. The synthetic def's `type` defaults to `'string'`, but sort handles numeric values correctly — coercing as needed. For tighter type control, define a real `FieldDef` and register it at the Query construction site (chapter 10).
+A subtlety: a derived column you reference via the `.sort('billRatio', ...)` string form is recognised by its synthetic field-def, which queriton adds automatically when you `.derive()`. The synthetic def's `type` defaults to `'string'`, but sort handles numeric values correctly — coercing as needed. For tighter type control, define a real `FieldDef` and register it at the Query construction site (chapter 11).
 
 ## Derive runs before summarize
 

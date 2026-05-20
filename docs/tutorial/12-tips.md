@@ -1,4 +1,4 @@
-# 11. Tips
+# 12. Tips
 
 A few patterns and pitfalls that don't fit neatly into one chapter but that you'll meet sooner or later. Read once now; come back when something goes wrong.
 
@@ -80,8 +80,8 @@ The DrawTab Explorer uses this to power its API Explorer view — pipelines roun
 
 Three rules to check, in order:
 
-1. **Is the field-def's `type` correct?** Numeric aggregators (`sum`, `avg`, etc.) skip non-numeric values. If `type: 'string'` is set on a numeric column, the values pass through `getValue` as strings, and aggregators may not coerce as you expect. See chapter 10.
-2. **Are nulls being counted vs. skipped as you expect?** `count` includes them; everything else doesn't. Re-read chapter 6 if anything in your output is off by a small number.
+1. **Is the field-def's `type` correct?** Numeric aggregators (`sum`, `avg`, etc.) skip non-numeric values. If `type: 'string'` is set on a numeric column, the values pass through `getValue` as strings, and aggregators may not coerce as you expect. See chapter 11.
+2. **Are nulls being counted vs. skipped as you expect?** `count` includes them; everything else doesn't. Re-read chapter 7 if anything in your output is off by a small number.
 3. **Did you mean `.select()` or `.derive()`?** They're easy to swap by mistake. `.select()` projects to a new row shape (drops other columns); `.derive()` adds columns to the existing shape. If your downstream `.filter()` complains about a missing field, you may have `.select()`-ed it away.
 
 ## Performance: the topK optimisation
@@ -96,6 +96,6 @@ You've seen every public verb queriton offers. From here, the next steps depend 
 
 - **Reference** — the package's `README.md` has the full API surface, condensed.
 - **The DrawTab Explorer** — queriton's biggest consumer. See [src/routes/api-explorer/+page.svelte](https://github.com/TheSevenPens/DrawTabDataExplorer/blob/main/src/routes/api-explorer/+page.svelte) for a runnable playground over real data.
-- **Custom field-defs** — chapter 10 has the contract. The DrawTab codebase has 10+ examples under [data-repo/lib/entities/](https://github.com/TheSevenPens/DrawTabDataExplorer/tree/main/data-repo/lib/entities).
+- **Custom field-defs** — chapter 11 has the contract. The DrawTab codebase has 10+ examples under [data-repo/lib/entities/](https://github.com/TheSevenPens/DrawTabDataExplorer/tree/main/data-repo/lib/entities).
 
 Happy querying.

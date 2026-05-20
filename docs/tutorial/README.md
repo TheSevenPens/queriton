@@ -11,12 +11,13 @@ Every fenced ` ```ts run ` code block in the chapters is extracted into the test
 3. **[Deriving Columns](03-deriving-columns.md)** — `.derive()` for computed columns.
 4. **[Arrays and CSV Fields](04-arrays-and-csv.md)** — array-valued columns, `.unroll()`, the CSV split/rejoin roundtrip.
 5. **[Grouping and Aggregation](05-grouping.md)** — `.countBy`, `.summarize`, HAVING-style filters, `countIf`, `collect`, `join`.
-6. **[Nulls and Empties](06-nulls-and-empties.md)** — the rules for missing values; where queriton diverges from SQL.
-7. **[Joins](07-joins.md)** — inner / left / semi / anti — plus the null = null surprise.
-8. **[Set Operations](08-set-operations.md)** — `.concat` (UNION ALL), `.intersect`, `.except`, `.distinctRows`.
-9. **[The DataSet](09-the-dataset.md)** — the named-collection container.
-10. **[FieldDef and FieldDisplayDef](10-field-defs.md)** — what's inside the `fields` array.
-11. **[Tips](11-tips.md)** — common pitfalls, debugging, performance notes.
+6. **[Window Functions](06-window-functions.md)** — `.window()`, top N per group, ranking, running aggregates, `lag` / `lead`.
+7. **[Nulls and Empties](07-nulls-and-empties.md)** — the rules for missing values; where queriton diverges from SQL.
+8. **[Joins](08-joins.md)** — inner / left / semi / anti — plus the null = null surprise.
+9. **[Set Operations](09-set-operations.md)** — `.concat` (UNION ALL), `.intersect`, `.except`, `.distinctRows`.
+10. **[The DataSet](10-the-dataset.md)** — the named-collection container.
+11. **[FieldDef and FieldDisplayDef](11-field-defs.md)** — what's inside the `fields` array.
+12. **[Tips](12-tips.md)** — common pitfalls, debugging, performance notes.
 
 ## Conventions
 

@@ -27,7 +27,7 @@ It works in Node, in the browser, and in any bundler that understands ESM. The w
 import { Query, DataSet } from '@thesevenpens/queriton';
 ```
 
-`Query` is the per-collection workhorse. `DataSet` (covered in chapter 9) is an optional container that groups Queries together — you don't need it to get started.
+`Query` is the per-collection workhorse. `DataSet` (covered in chapter 10) is an optional container that groups Queries together — you don't need it to get started.
 
 ## The dataset
 
@@ -58,7 +58,7 @@ expect(rows).toHaveLength(344);
 A few things to notice:
 
 - The loader is `async () => penguins` — a zero-argument function that returns a Promise of the rows. queriton calls it lazily, the first time you materialise the Query. If your data lives in a file or a remote service, this is where the fetch goes.
-- `penguinFields` is a typed array of `FieldDef<Penguin>` describing each column. The engine uses field definitions to read values for filtering, sorting, and grouping — covered in chapter 10.
+- `penguinFields` is a typed array of `FieldDef<Penguin>` describing each column. The engine uses field definitions to read values for filtering, sorting, and grouping — covered in chapter 11.
 - `.toArray()` is the standard way to extract the result. It returns a Promise of `Penguin[]`.
 
 ## Counting without materialising
