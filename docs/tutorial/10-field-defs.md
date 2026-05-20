@@ -1,4 +1,4 @@
-# 9. FieldDef and FieldDisplayDef
+# 10. FieldDef and FieldDisplayDef
 
 In this chapter you'll learn what's inside the `fields` arrays you've been passing into every Query, why queriton splits them into two tiers, and how to write your own.
 

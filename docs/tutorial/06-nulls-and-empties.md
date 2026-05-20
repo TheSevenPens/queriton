@@ -1,4 +1,4 @@
-# 5. Nulls and Empties
+# 6. Nulls and Empties
 
 In this chapter you'll learn exactly how queriton treats missing values. The rules are small, consistent, and in three specific places they diverge from SQL — pin them now so they don't surprise you later.
 
@@ -119,7 +119,7 @@ This is occasionally what you want (you genuinely care about position or complet
 | `.summarize({ count })`                  | counted                                          |
 | `.summarize({ sum/avg/min/max/median })` | skipped                                          |
 | `.summarize({ distinctCount })`          | skipped                                          |
-| `.summarize({ first/last/collect })`     | included as `""`                                 |
+| `.summarize({ first/last/collect/join })` | included as `""`                                 |
 | `.summarize({ by: f })`                  | bundled into the `""` group                      |
 
 In the next chapter we'll meet the verb where queriton's null-handling story most clearly diverges from SQL: joins.

@@ -34,8 +34,14 @@ export const peopleFields: AnyFieldDef[] = [
 		label: 'Hobbies',
 		type: 'string',
 		group: 'data',
-		// After .unroll() the column contains a scalar — until then the
-		// FieldDef just reports its presence. Tests don't read it pre-unroll.
-		getValue: (row: Person) => (Array.isArray(row.hobbies) ? row.hobbies.join(',') : ''),
+		// Pre-unroll the column is `string[] | null`; post-unroll it's a
+		// single string element. The getValue needs to handle both so that
+		// downstream verbs like `.countBy('hobbies')` work after an unroll.
+		getValue: (row: Person) => {
+			const v = row.hobbies as unknown;
+			if (Array.isArray(v)) return v.join(',');
+			if (typeof v === 'string') return v;
+			return '';
+		},
 	},
 ];

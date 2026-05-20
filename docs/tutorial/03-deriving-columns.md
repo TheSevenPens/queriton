@@ -56,7 +56,7 @@ expect(longBills[0].island).toBe('Biscoe');
 expect((longBills[0].billRatio as number).toFixed(3)).toBe('3.510');
 ```
 
-A subtlety: a derived column you reference via the `.sort('billRatio', ...)` string form is recognised by its synthetic field-def, which queriton adds automatically when you `.derive()`. The synthetic def's `type` defaults to `'string'`, but sort handles numeric values correctly — coercing as needed. For tighter type control, define a real `FieldDef` and register it at the Query construction site (chapter 9).
+A subtlety: a derived column you reference via the `.sort('billRatio', ...)` string form is recognised by its synthetic field-def, which queriton adds automatically when you `.derive()`. The synthetic def's `type` defaults to `'string'`, but sort handles numeric values correctly — coercing as needed. For tighter type control, define a real `FieldDef` and register it at the Query construction site (chapter 10).
 
 ## Derive runs before summarize
 
@@ -81,27 +81,4 @@ The derived `heavy` column becomes a grouping key. Without the upstream `.derive
 >
 > **From SQL:** there's no direct equivalent in standard SQL — `.derive()` corresponds to projecting a computed expression in the `SELECT` clause, but queriton's version keeps **all** existing columns and adds the new ones, which SQL needs `SELECT *, expr AS name` to express.
 
-## Unrolling array columns
-
-`.unroll(field)` explodes a top-level array-valued column into one row per element. The Palmer Penguins dataset has no array columns, so we'll derive one to demonstrate:
-
-```ts run
-const tagged = await penguinsQ()
-	.filter((p) => p.species === 'Chinstrap')
-	.take(2)
-	.derive({ tags: (p) => [p.species, p.island, p.sex ?? 'unknown'] as unknown as string })
-	.toArray();
-// Each row's `tags` is an array of three strings.
-expect(tagged).toHaveLength(2);
-expect(Array.isArray((tagged[0] as unknown as { tags: string[] }).tags)).toBe(true);
-expect((tagged[0] as unknown as { tags: string[] }).tags).toHaveLength(3);
-```
-
-The cast is unfortunate but reflects a real constraint: `.derive()` is typed to return `string | number`, while `.unroll()` requires array values. In practice you'd register a `FieldDef` for the array column (so its type is fully expressed) and skip the derive workaround.
-
-Things to notice:
-
-- Rows whose array field is empty (`[]`) or non-array are **dropped** by unroll. This matches dplyr's `unnest` and Arquero's `unroll`.
-- Unroll changes row count: a 5-row Query with a 3-element array per row produces 15 rows.
-
-In the next chapter we'll group and aggregate — the verbs that actually condense rows down to summaries.
+In the next chapter we'll work with array-valued and CSV-string fields — including the `.unroll()` verb that explodes arrays into rows.

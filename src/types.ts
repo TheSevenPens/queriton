@@ -74,6 +74,9 @@ export interface ReverseStep {
  *   input order (including empty strings).
  * - `collect` — array of all raw `field` values in input order
  *   (including empties).
+ * - `join` — string of all raw `field` values joined by `sep` (including
+ *   empties). The string equivalent of `collect`; useful for round-tripping
+ *   CSV-like fields without a follow-up `.derive()`.
  */
 export type AggregatorOp =
 	| 'count'
@@ -86,7 +89,8 @@ export type AggregatorOp =
 	| 'first'
 	| 'last'
 	| 'distinctCount'
-	| 'collect';
+	| 'collect'
+	| 'join';
 
 export interface AggregatorSpec {
 	/** Output column name in the summary rows. */
@@ -101,6 +105,8 @@ export interface AggregatorSpec {
 	predicate?: (item: unknown) => boolean;
 	/** For op='countIf': boolean filter tree (URL-serialisable form). */
 	filterExpr?: FilterExpr;
+	/** For op='join': string separator inserted between collected values. */
+	sep?: string;
 }
 
 /**
@@ -160,8 +166,11 @@ export interface BoolFilterStep {
  */
 export interface DeriveStep {
 	kind: 'derive';
+	// Allow array returns so the common `.derive(...).unroll(...)` pattern
+	// composes without a cast. The engine already supports array values at
+	// runtime; the type just under-promised before.
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	cols: Record<string, (item: any) => string | number>;
+	cols: Record<string, (item: any) => string | number | readonly unknown[]>;
 }
 
 /**
@@ -257,10 +266,16 @@ export interface ConcatResolvedStep {
  * Explodes an array-valued top-level field into one row per element. Rows
  * with non-array or empty-array values for the field are dropped (matches
  * Arquero / dplyr's `unnest` semantics).
+ *
+ * If `sep` is set, the field is read as a string and `.split(sep)` is
+ * applied first; empty-string elements are dropped (so `''.split(',')`
+ * doesn't produce a phantom row). Lets you operate on CSV-like string
+ * fields without a separate `.derive()` to convert them to arrays.
  */
 export interface UnrollStep {
 	kind: 'unroll';
 	field: string;
+	sep?: string;
 }
 
 /**

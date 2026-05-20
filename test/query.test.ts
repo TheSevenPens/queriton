@@ -611,6 +611,136 @@ describe('Query — unroll', () => {
 		const charlie = rows.filter((r) => (r as Record<string, unknown>).name === 'Charlie');
 		expect(charlie).toHaveLength(0);
 	});
+
+	it('derive can return an array without a cast (typing widened)', async () => {
+		// Pre-fix this required `as unknown as string`. After widening the
+		// derive return type to `string | number | readonly unknown[]` the
+		// cast is unnecessary.
+		const rows = await peopleQ()
+			.derive({ hobby: (p) => p.hobbies ?? [] })
+			.unroll('hobby')
+			.toArray();
+		// Same as the array case but Eve's null becomes [] → row dropped.
+		expect(rows.length).toBe(3 + 2 + 1);
+	});
+
+	describe('unroll with sep (CSV-string mode)', () => {
+		type CsvPerson = { name: string; hobbies: string };
+		const csvRows: CsvPerson[] = [
+			{ name: 'Alice', hobbies: 'climbing,coding,tea' },
+			{ name: 'Bob', hobbies: 'climbing,biking' },
+			{ name: 'Charlie', hobbies: '' },
+			{ name: 'Dana', hobbies: 'coding' },
+			{ name: 'Trailing', hobbies: 'jazz,blues,' }, // trailing-separator footgun
+		];
+		const csvFields = [
+			{
+				key: 'name',
+				label: 'name',
+				type: 'string' as const,
+				getValue: (r: CsvPerson) => r.name,
+			},
+			{
+				key: 'hobbies',
+				label: 'hobbies',
+				type: 'string' as const,
+				getValue: (r: CsvPerson) => r.hobbies,
+			},
+		];
+		function csvQ() {
+			return new Query<CsvPerson>(async () => csvRows, csvFields);
+		}
+
+		it('splits a CSV-string field and explodes it', async () => {
+			const rows = await csvQ().unroll('hobbies', { sep: ',' }).toArray();
+			// Alice 3 + Bob 2 + Dana 1 + Trailing 2 ('jazz','blues') = 8. Charlie's
+			// empty string yields zero elements after the empty-element drop.
+			expect(rows).toHaveLength(8);
+			// Charlie is absent (empty CSV → no rows).
+			expect(rows.filter((r) => r.name === 'Charlie')).toHaveLength(0);
+			// The trailing comma in 'jazz,blues,' does NOT produce a phantom row.
+			expect(rows.filter((r) => r.name === 'Trailing')).toHaveLength(2);
+		});
+
+		it('passes through non-string values unchanged in sep-mode', async () => {
+			// If a row's value isn't a string when sep is given, it falls through
+			// to the no-array path (same as a null value). Construct a mixed
+			// fixture to verify.
+			type Mixed = { name: string; tags: string | null };
+			const mixedRows: Mixed[] = [
+				{ name: 'A', tags: 'red,blue' },
+				{ name: 'B', tags: null },
+			];
+			const mixedFields = [
+				{ key: 'name', label: 'n', type: 'string' as const, getValue: (r: Mixed) => r.name },
+				{
+					key: 'tags',
+					label: 't',
+					type: 'string' as const,
+					getValue: (r: Mixed) => r.tags ?? '',
+				},
+			];
+			const rows = await new Query<Mixed>(async () => mixedRows, mixedFields)
+				.unroll('tags', { sep: ',' })
+				.toArray();
+			// A: 2 elements; B: null falls through to passthrough (1 row) = 3 total.
+			expect(rows).toHaveLength(3);
+			expect(rows.filter((r) => r.name === 'B')).toHaveLength(1);
+		});
+
+		it('round-trips CSV via unroll(sep) + summarize.join', async () => {
+			const cleaned = await csvQ()
+				.unroll('hobbies', { sep: ',' })
+				.filter('hobbies', '!=', 'tea')
+				.summarize({ by: 'name', join: { hobbies: { field: 'hobbies', sep: ',' } } })
+				.sort('name', 'asc')
+				.toArray();
+			expect(cleaned).toEqual([
+				{ name: 'Alice', hobbies: 'climbing,coding' },
+				{ name: 'Bob', hobbies: 'climbing,biking' },
+				{ name: 'Dana', hobbies: 'coding' },
+				{ name: 'Trailing', hobbies: 'jazz,blues' },
+			]);
+			// Charlie isn't in the output — his row was dropped during unroll
+			// and there's nothing to put back during summarize.
+		});
+	});
+});
+
+describe('Query — summarize.join aggregator', () => {
+	it('joins collected values with the given separator', async () => {
+		// One Adelie group; pipe-separate the first few islands to verify
+		// ordering and separator handling.
+		const result = await peopleQ()
+			.derive({ hobby: (p) => p.hobbies ?? [] })
+			.unroll('hobby')
+			.summarize({ by: 'name', join: { csv: { field: 'hobby', sep: '|' } } })
+			.sort('name', 'asc')
+			.toArray();
+		const alice = result.find((r) => r.name === 'Alice');
+		expect(alice?.csv).toBe('climbing|coding|tea');
+		const bob = result.find((r) => r.name === 'Bob');
+		expect(bob?.csv).toBe('climbing|biking');
+	});
+
+	it('includes empty members (parallel to collect)', async () => {
+		// `join` follows `collect`'s rule for empties — included as raw "".
+		// Use a tiny synthetic fixture so the expectation is exact.
+		type Row = { g: string; v: string | null };
+		const rows: Row[] = [
+			{ g: 'A', v: 'x' },
+			{ g: 'A', v: null },
+			{ g: 'A', v: 'y' },
+		];
+		const fields = [
+			{ key: 'g', label: 'g', type: 'string' as const, getValue: (r: Row) => r.g },
+			{ key: 'v', label: 'v', type: 'string' as const, getValue: (r: Row) => r.v ?? '' },
+		];
+		const out = await new Query<Row>(async () => rows, fields)
+			.summarize({ by: 'g', join: { all: { field: 'v', sep: ',' } } })
+			.toArray();
+		expect(out[0].all).toBe('x,,y'); // empty between x and y from the null row
+	});
 });
 
 describe('Query — keyBy / collectBy', () => {

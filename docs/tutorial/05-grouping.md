@@ -1,4 +1,4 @@
-# 4. Grouping and Aggregation
+# 5. Grouping and Aggregation
 
 In this chapter you'll group rows by one or more keys and compute summary values for each group. You'll meet the two verbs that drive every aggregation: `.countBy()` for the common case and `.summarize()` for everything else.
 
@@ -40,7 +40,7 @@ Two species are single-island: Gentoo is only on Biscoe, Chinstrap is only on Dr
 
 ## Summarize: aggregators per group
 
-`.summarize()` is the general form. The spec is an object: `by` is the grouping key(s); the other keys (`count`, `sum`, `avg`, `min`, `max`, `median`, `distinctCount`, `first`, `last`, `collect`, `countIf`) each describe an aggregator.
+`.summarize()` is the general form. The spec is an object: `by` is the grouping key(s); the other keys (`count`, `sum`, `avg`, `min`, `max`, `median`, `distinctCount`, `first`, `last`, `collect`, `join`, `countIf`) each describe an aggregator.
 
 ```ts run
 const stats = await penguinsQ()
@@ -148,6 +148,7 @@ expect(summary[2].islandCount).toBe(1); // Gentoo only on Biscoe
 - `distinctCount` counts unique non-empty values.
 - `first` / `last` take the raw value from the first/last row in **input order** (no sort applied internally).
 - `collect` returns an array of all values in input order — useful for flattening or further processing.
+- `join` is `collect`'s string-shaped sibling: same values, joined with a separator. Chapter 4 demonstrates the canonical CSV roundtrip with it (`.unroll(..., { sep: ',' })` going in, `summarize({ join: { ... } })` coming back out).
 
 > **From dplyr:** `.summarize()` is `summarise()`. queriton's spec-as-object form is closer to `data.table::dcast` or Arquero's `rollup` than dplyr's verb-per-aggregator style, but the result is the same.
 
