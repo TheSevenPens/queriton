@@ -13,7 +13,7 @@ Every fenced ` ```ts run ` code block in the chapters is extracted into the test
 5. **[Grouping and Aggregation](05-grouping.md)** — `.countBy`, `.summarize`, HAVING-style filters, `countIf`, `collect`, `join`.
 6. **[Nulls and Empties](06-nulls-and-empties.md)** — the rules for missing values; where queriton diverges from SQL.
 7. **[Joins](07-joins.md)** — inner / left / semi / anti — plus the null = null surprise.
-8. **[Concat](08-concat.md)** — UNION ALL; combining Queries vertically.
+8. **[Set Operations](08-set-operations.md)** — `.concat` (UNION ALL), `.intersect`, `.except`, `.distinctRows`.
 9. **[The DataSet](09-the-dataset.md)** — the named-collection container.
 10. **[FieldDef and FieldDisplayDef](10-field-defs.md)** — what's inside the `fields` array.
 11. **[Tips](11-tips.md)** — common pitfalls, debugging, performance notes.

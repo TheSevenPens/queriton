@@ -24,6 +24,11 @@ export type StepKind =
 	| 'leftjoinResolved'
 	| 'concat'
 	| 'concatResolved'
+	| 'intersect'
+	| 'intersectResolved'
+	| 'except'
+	| 'exceptResolved'
+	| 'distinctRows'
 	| 'topK';
 
 export interface FilterStep {
@@ -263,6 +268,50 @@ export interface ConcatResolvedStep {
 }
 
 /**
+ * INTERSECT — set-semantics intersection. Keeps rows of `this` that
+ * also appear in `other`, deduplicated. Comparison is full-row via a
+ * canonical JSON form (`JSON.stringify`), which is sensitive to
+ * object-key order; callers who need a custom comparison should
+ * `.select()` to a consistent shape first.
+ */
+export interface IntersectStep {
+	kind: 'intersect';
+	other: unknown;
+}
+
+export interface IntersectResolvedStep {
+	kind: 'intersectResolved';
+	rightRows: unknown[];
+}
+
+/**
+ * EXCEPT — set-semantics difference. Keeps rows of `this` that do
+ * not appear in `other`, deduplicated. Same comparison rule as
+ * `intersect`.
+ */
+export interface ExceptStep {
+	kind: 'except';
+	other: unknown;
+}
+
+export interface ExceptResolvedStep {
+	kind: 'exceptResolved';
+	rightRows: unknown[];
+}
+
+/**
+ * Row-level deduplication. Keeps one row per unique full-row shape
+ * (canonical-JSON comparison). Composes with `.concat()` for the
+ * SQL UNION DISTINCT pattern: `a.concat(b).distinctRows()`.
+ *
+ * Distinct from `.distinct(field)` (terminal verb that returns
+ * distinct *values* of a single field).
+ */
+export interface DistinctRowsStep {
+	kind: 'distinctRows';
+}
+
+/**
  * Explodes an array-valued top-level field into one row per element. Rows
  * with non-array or empty-array values for the field are dropped (matches
  * Arquero / dplyr's `unnest` semantics).
@@ -316,7 +365,12 @@ export type Step =
 	| LeftjoinStep
 	| LeftjoinResolvedStep
 	| ConcatStep
-	| ConcatResolvedStep;
+	| ConcatResolvedStep
+	| IntersectStep
+	| IntersectResolvedStep
+	| ExceptStep
+	| ExceptResolvedStep
+	| DistinctRowsStep;
 
 /**
  * Shape of rows produced by a `summarize` or `project` step. Keys are the

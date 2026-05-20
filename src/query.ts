@@ -18,6 +18,9 @@ import type {
 	AntijoinStep,
 	LeftjoinStep,
 	ConcatStep,
+	IntersectStep,
+	ExceptStep,
+	DistinctRowsStep,
 } from './types.js';
 import { executePipeline } from './engine.js';
 import { rewrite } from './rewrite.js';
@@ -462,6 +465,45 @@ export class Query<T> {
 	}
 
 	/**
+	 * INTERSECT — keeps rows of `this` that also appear in `other`,
+	 * deduplicated. Comparison is full-row via canonical JSON
+	 * (`JSON.stringify`). For partial-row equality use `.semijoin()`
+	 * on a specific key.
+	 */
+	intersect<U>(other: Query<U>): Query<T> {
+		return new Query(this.load, this.fields, [
+			...this.steps,
+			{ kind: 'intersect', other } as IntersectStep,
+		]);
+	}
+
+	/**
+	 * EXCEPT — keeps rows of `this` that do not appear in `other`,
+	 * deduplicated. Same comparison as `.intersect()`.
+	 */
+	except<U>(other: Query<U>): Query<T> {
+		return new Query(this.load, this.fields, [
+			...this.steps,
+			{ kind: 'except', other } as ExceptStep,
+		]);
+	}
+
+	/**
+	 * Row-level deduplication. Keeps one row per unique full-row shape
+	 * (canonical-JSON comparison). Compositional foundation for SQL's
+	 * UNION DISTINCT — `a.concat(b).distinctRows()`.
+	 *
+	 * Distinct from `.distinct(field)`, which returns distinct *values*
+	 * of a single field as an array.
+	 */
+	distinctRows(): Query<T> {
+		return new Query(this.load, this.fields, [
+			...this.steps,
+			{ kind: 'distinctRows' } as DistinctRowsStep,
+		]);
+	}
+
+	/**
 	 * Materialise the query and bucket rows by a single field value. Last
 	 * row wins on collision. The key is read directly from the row when
 	 * `field` is a top-level own property (so derive / join / summarize /
@@ -544,6 +586,13 @@ export class Query<T> {
 					kind: 'concatResolved',
 					rightRows,
 					rightFields: right.fields,
+				});
+			} else if (step.kind === 'intersect' || step.kind === 'except') {
+				const right = step.other as Query<unknown>;
+				const rightRows = await right.toArray();
+				resolved.push({
+					kind: `${step.kind}Resolved` as 'intersectResolved' | 'exceptResolved',
+					rightRows,
 				});
 			} else {
 				resolved.push(step);

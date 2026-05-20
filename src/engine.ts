@@ -17,6 +17,8 @@ import type {
 	AntijoinResolvedStep,
 	LeftjoinResolvedStep,
 	ConcatResolvedStep,
+	IntersectResolvedStep,
+	ExceptResolvedStep,
 	SummaryRow,
 } from './types.js';
 
@@ -150,6 +152,15 @@ export function executePipeline<T>(
 				activeFields = extended;
 				break;
 			}
+			case 'intersectResolved':
+				data = applyIntersect(data, step);
+				break;
+			case 'exceptResolved':
+				data = applyExcept(data, step);
+				break;
+			case 'distinctRows':
+				data = applyDistinctRows(data);
+				break;
 			case 'unroll':
 				data = applyUnroll(data, step);
 				break;
@@ -161,9 +172,12 @@ export function executePipeline<T>(
 			case 'antijoin':
 			case 'leftjoin':
 			case 'concat':
-				// Unresolved join/concat — Query.toArray() should have replaced
-				// these with their *Resolved counterparts before reaching the
-				// engine. Seeing one here means a caller bypassed toArray().
+			case 'intersect':
+			case 'except':
+				// Unresolved join/concat/intersect/except — Query.toArray()
+				// should have replaced these with their *Resolved counterparts
+				// before reaching the engine. Seeing one here means a caller
+				// bypassed toArray().
 				throw new Error(
 					`Engine received unresolved ${step.kind} step. Did you forget to await Query.toArray()?`,
 				);
@@ -637,6 +651,59 @@ function applyConcat(
 		rows: [...items, ...step.rightRows],
 		fields: mergeFieldDefs(leftFields, step.rightFields),
 	};
+}
+
+/**
+ * Canonical full-row key for set operations. Uses `JSON.stringify` so
+ * nested objects and arrays are compared structurally. Sensitive to
+ * object-key insertion order — for queriton's typical "rows from a
+ * single loader" usage that's stable, but if rows come from sources
+ * with inconsistent key order the caller should `.select()` to a
+ * known shape first.
+ */
+function setOpKey(row: unknown): string {
+	return JSON.stringify(row);
+}
+
+function applyIntersect(items: unknown[], step: IntersectResolvedStep): unknown[] {
+	const rightKeys = new Set(step.rightRows.map(setOpKey));
+	const seen = new Set<string>();
+	const out: unknown[] = [];
+	for (const item of items) {
+		const key = setOpKey(item);
+		if (rightKeys.has(key) && !seen.has(key)) {
+			seen.add(key);
+			out.push(item);
+		}
+	}
+	return out;
+}
+
+function applyExcept(items: unknown[], step: ExceptResolvedStep): unknown[] {
+	const rightKeys = new Set(step.rightRows.map(setOpKey));
+	const seen = new Set<string>();
+	const out: unknown[] = [];
+	for (const item of items) {
+		const key = setOpKey(item);
+		if (!rightKeys.has(key) && !seen.has(key)) {
+			seen.add(key);
+			out.push(item);
+		}
+	}
+	return out;
+}
+
+function applyDistinctRows(items: unknown[]): unknown[] {
+	const seen = new Set<string>();
+	const out: unknown[] = [];
+	for (const item of items) {
+		const key = setOpKey(item);
+		if (!seen.has(key)) {
+			seen.add(key);
+			out.push(item);
+		}
+	}
+	return out;
 }
 
 function applyUnroll(items: unknown[], step: UnrollStep): unknown[] {
