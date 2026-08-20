@@ -150,6 +150,17 @@ describe('rewrite — fuse sort + take into top-K', () => {
 		expect(out).toEqual([{ kind: 'topK', field: 'mpg', direction: 'desc', count: 5 }]);
 	});
 
+	it('leaves a non-positive take unfused — topK cannot express slice semantics', () => {
+		// take(-1) means "all but the last"; topK reads count <= 0 as "nothing".
+		for (const count of [0, -1]) {
+			const out = rewrite([
+				{ kind: 'sort', field: 'mpg', direction: 'desc' },
+				{ kind: 'take', count },
+			]);
+			expect(out.map((s) => s.kind)).toEqual(['sort', 'take']);
+		}
+	});
+
 	it('leaves sort alone when no take follows', () => {
 		const out = rewrite([{ kind: 'sort', field: 'mpg', direction: 'desc' }]);
 		expect(out).toEqual([{ kind: 'sort', field: 'mpg', direction: 'desc' }]);
@@ -202,6 +213,23 @@ describe('rewrite — execution equivalence (with vs. without)', () => {
 		{
 			name: 'reverse + reverse (cancellation)',
 			build: () => carsQ().reverse().reverse() as Query<unknown>,
+		},
+		{
+			name: 'sort by an unknown field + take',
+			build: () => carsQ().sort('nosuchfield', 'desc').take(5) as Query<unknown>,
+		},
+		{
+			name: 'select projects the sort field away, then sort + take',
+			build: () =>
+				carsQ().select(['mpg', 'cyl']).sort('hp', 'asc').take(5) as Query<unknown>,
+		},
+		{
+			name: 'sort + take(0)',
+			build: () => carsQ().sort('mpg', 'desc').take(0) as Query<unknown>,
+		},
+		{
+			name: 'sort + take(-1) (slice semantics the fusion must not claim)',
+			build: () => carsQ().sort('mpg', 'desc').take(-1) as Query<unknown>,
 		},
 		{
 			name: 'complex chain: filter + sort + take',

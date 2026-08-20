@@ -153,7 +153,10 @@ function fuseSortTake(steps: Step[]): Step[] {
 	for (let i = 0; i < steps.length; i++) {
 		const a = steps[i];
 		const b = steps[i + 1];
-		if (a?.kind === 'sort' && b?.kind === 'take') {
+		// Only fuse a positive count: `take` is implemented as slice(0, count),
+		// so a negative count drops rows from the end — something topK, which
+		// treats count <= 0 as "nothing", cannot express.
+		if (a?.kind === 'sort' && b?.kind === 'take' && (b as TakeStep).count > 0) {
 			const sort = a as SortStep;
 			const take = b as TakeStep;
 			const topK: TopKStep = {

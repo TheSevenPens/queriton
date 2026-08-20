@@ -288,8 +288,14 @@ function applySort<T>(items: T[], step: SortStep, fields: FieldDef<T>[]): T[] {
  * `Array.sort` + `slice(0, n)`.
  */
 function applyTopK<T>(items: T[], step: TopKStep, fields: FieldDef<T>[]): T[] {
+	if (step.count <= 0) return [];
 	const fieldDef = getFieldDef(step.field, fields);
-	if (!fieldDef || step.count <= 0) return [];
+	// Unknown field: fall back to what the unfused plan would produce.
+	// applySort leaves the order untouched when it can't resolve the field, so
+	// sort + take yields the first `count` rows — this must match. Returning []
+	// here let the optimiser change results: a sort by a field that a preceding
+	// .select() had projected away silently emptied the whole result.
+	if (!fieldDef) return items.slice(0, step.count);
 	const n = step.count;
 	const dir = step.direction === 'asc' ? 1 : -1;
 
