@@ -478,6 +478,14 @@ export interface FieldDisplayDef<T> extends FieldDef<T> {
 	computed?: boolean;
 	/** Unit suffix consumed by unit-aware value formatters. */
 	unit?: string;
+	/**
+	 * Long free text meant to be read as authored (notes, descriptions).
+	 * Detail views render it as a full-width monospace block with
+	 * whitespace and line breaks preserved instead of a one-line spec
+	 * row. Purely presentational — filtering, sorting and grouping still
+	 * see the raw `getValue` string.
+	 */
+	multiline?: boolean;
 }
 
 // --- Convenience aliases ---
