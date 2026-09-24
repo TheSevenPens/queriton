@@ -15,12 +15,17 @@ export class DataSet {
 
 	/**
 	 * Register a named collection. Returns the `Query<T>` so the caller can
-	 * keep a typed reference. The loader is invoked at most once for the
-	 * lifetime of this DataSet instance.
+	 * keep a typed reference. A successful load is cached for the lifetime of
+	 * this DataSet instance; a failed one is not, so the next access retries
+	 * instead of replaying the same rejection forever.
 	 */
 	registerCollection<T>(name: string, loader: () => Promise<T[]>, fields: AnyFieldDef[]): Query<T> {
 		let cached: Promise<T[]> | undefined;
-		const memoizedLoader = (): Promise<T[]> => (cached ??= loader());
+		const memoizedLoader = (): Promise<T[]> =>
+			(cached ??= loader().catch((err: unknown) => {
+				cached = undefined;
+				throw err;
+			}));
 		const q = new Query<T>(memoizedLoader, fields, []);
 		this.collections.set(name, q as Query<unknown>);
 		return q;
