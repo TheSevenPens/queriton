@@ -103,6 +103,23 @@ const lastThree = await penguinsQ().sort('species', 'asc').last(3).toArray();
 expect(lastThree.every((p) => p.species === 'Gentoo')).toBe(true);
 ```
 
+## Ranking: top and bottom
+
+`.top(n, field)` is `.sort(field, 'desc').take(n)` and `.bottom(n, field)` is `.sort(field, 'asc').take(n)` — with one difference: rows where `field` is empty are left out, because they have no value to rank. That matters most for `.bottom()`: an ascending sort puts empties *first*, so the literal expansion would answer "the lightest penguins" with the two that were never weighed.
+
+```ts run
+const heaviest = await penguinsQ().top(3, 'body_mass_g').pluck('body_mass_g');
+expect(heaviest).toEqual(['6300', '6050', '6000']);
+
+// Two penguins have no body mass; sort-asc-take ranks them lightest.
+const literal = await penguinsQ().sort('body_mass_g', 'asc').take(2).pluck('body_mass_g');
+expect(literal).toEqual(['', '']);
+const lightest = await penguinsQ().bottom(2, 'body_mass_g').pluck('body_mass_g');
+expect(lightest).toEqual(['2700', '2850']);
+```
+
+Without a field, `.top(n)` keeps the first _n_ rows of the current order and `.bottom(n)` the last _n_. `.pluck(field)` — used above — returns one value per row as a plain array, in order, keeping duplicates and empties (unlike `.distinct()`).
+
 ## Selecting columns
 
 `.select(fields)` projects each row to only the listed fields. It changes the row shape — the resulting Query holds `SummaryRow`, a `Record<string, string | number | string[]>`, not your original type.

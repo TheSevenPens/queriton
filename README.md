@@ -85,10 +85,12 @@ Promise.
 - **Filter** — `.filter(field, op, value)`, `.filter(predicateFn)`, `.filter(boolExpr)`, `.filterIn(field, values)`, `.filterNotIn(field, values)`
 - **Sort** — `.sort(field, direction?)`, `.sort([{field, direction?}, …])` (primary-first)
 - **Pagination** — `.take(n)`, `.skip(n)`, `.last(n)`, `.reverse()`
+- **Rank** — `.top(n, field?)`, `.bottom(n, field?)` — sort + take on rows that have a value
 - **Project** — `.select([fields])`
 - **Compute** — `.derive({col: row => …})`
 - **Group / aggregate** — `.summarize({by, count, sum, avg, min, max, median, distinctCount, first, last, collect})`
 - **Distinct** — `.distinct(field)` / `.values(field)` (synonym)
+- **Pluck** — `.pluck(field)`: one value per row, in order, as a plain array
 - **Joins** — `.join(other, leftKey, rightKey)`, `.semijoin`, `.antijoin`, `.leftjoin`
 - **Combine** — `.concat(other)` / `.union(other)` (synonym)
 - **Unroll arrays** — `.unroll(field)`

@@ -237,6 +237,30 @@ export class Query<T> {
 		return new Query(this.load, this.fields, [...this.steps, { kind: 'take', count }]);
 	}
 
+	/**
+	 * The `n` rows with the highest `field` — `.sort(field, 'desc').take(n)`,
+	 * except rows where `field` is empty are left out: they have no value to
+	 * rank. (Descending sort already puts empties last, so this only matters
+	 * when fewer than `n` rows have a value.) Without `field`, the first `n`
+	 * rows of the current order, like `.take(n)`.
+	 */
+	top(n: number, field?: string): Query<T> {
+		if (field === undefined) return this.take(n);
+		return this.filter(field, 'notempty', '').sort(field, 'desc').take(n);
+	}
+
+	/**
+	 * The `n` rows with the lowest `field` — `.sort(field, 'asc').take(n)`,
+	 * except rows where `field` is empty are left out. That exclusion is the
+	 * point: ascending sort puts empties *first*, so the literal expansion
+	 * answers "the 5 oldest tablets" with the 5 that have no year. Without
+	 * `field`, the last `n` rows of the current order, like `.last(n)`.
+	 */
+	bottom(n: number, field?: string): Query<T> {
+		if (field === undefined) return this.last(n);
+		return this.filter(field, 'notempty', '').sort(field, 'asc').take(n);
+	}
+
 	/** Drops the first `count` rows. Pairs with `.take()` for pagination. */
 	skip(count: number): Query<T> {
 		return new Query(this.load, this.fields, [...this.steps, { kind: 'skip', count }]);
@@ -647,5 +671,18 @@ export class Query<T> {
 
 	async count(): Promise<number> {
 		return (await this.toArray()).length;
+	}
+
+	/**
+	 * One field's value from every row, as a plain array — in row order,
+	 * duplicates and empties kept (unlike `.distinct()`, which dedupes, drops
+	 * empties and sorts). Reads through the same getter `.sort()` / `.filter()`
+	 * use, so nested and computed fields work, and so do columns a `.select()`
+	 * / `.summarize()` / `.derive()` created.
+	 */
+	async pluck(field: string): Promise<string[]> {
+		const rows = await this.toArray();
+		const read = this.keyReaderFor(field, rows[0]);
+		return rows.map(read);
 	}
 }
